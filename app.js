@@ -9,6 +9,7 @@ var sqsURL = 'https://sqs.us-west-2.amazonaws.com/983680736795/MarcinczykSQS';
 var sqs = new AWS.SQS();
 var s3labMsgID = 'S3labSQS';
 var s3 = new AWS.S3();
+var s3RequestReceivedID = 'S3DigestsSQSRecvd';
 
 var onMessageReceivedFunc = function(receivedCb) {
   return function(err, data){
@@ -57,6 +58,7 @@ var logDigests = function(logData){
     	var arr = hash.split(':');
     	logData[arr[0]] = arr[1].trim();
     });
+    logData.reqID = "S3DigestCalculated";
     simpleLogger.info('S3 file hash calculated', logData);
     keepListening();
   };
@@ -92,12 +94,12 @@ var handleMessage = function(err, msg) {
     console.log('Unknown SQS message id: ' + recvMsgID);
     return keepListening();
   }
-  // TODO check the log for the same request
   var s3fileInfo = {
     Bucket: msg.MessageAttributes.s3bucket.StringValue,
     Key: msg.MessageAttributes.s3key.StringValue,
   };
-  var logData = { s3bucket: s3fileInfo.Bucket, s3key: s3fileInfo.Key };
+  var logData = { s3bucket: s3fileInfo.Bucket, s3key: s3fileInfo.Key, reqID: s3RequestReceivedID };
+  // TODO check the log for the same request
   simpleLogger.info('Received S3 file hash calculation request from SQS', logData);
   s3.getObject(s3fileInfo, calcDigests(logData));
 }
