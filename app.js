@@ -8,6 +8,7 @@ var simpleLogger = require('./simpleLogger.js');
 var sqsURL = 'https://sqs.us-west-2.amazonaws.com/983680736795/MarcinczykSQS';
 var sqs = new AWS.SQS();
 var s3labMsgID = 'S3labSQS';
+var s3 = new AWS.S3();
 
 var onMessageReceivedFunc = function(receivedCb) {
   return function(err, data){
@@ -50,19 +51,36 @@ var keepListening = function(){
   receiveMessage(handleMessage);
 }
 
-var calcDigests = function(err, data){
-  if(err) return next(err);
+var logDigests = function(logData){
+  return function(err, digests){
+    digests.forEach(function(hash){
+    	var arr = hash.split(':');
+    	logData[arr[0]] = arr[1].trim();
+    });
+    simpleLogger.info('S3 file hash calculated', logData);
+    keepListening();
+  };
+};
 
-  helpers.calculateMultiDigest(
-    data.Body,
-    ['md5', 'sha1', 'sha256', 'sha512'],
-    showDigests, 1);
+var calcDigests = function(logData) {
+  return function(err, data){
+    if(err) {
+      console.log(err);
+      return keepListening();
+    }
+
+    helpers.calculateMultiDigest(
+      data.Body,
+      ['md5', 'sha1', 'sha256', 'sha512'],
+      logDigests(logData), 1);
+  };
 };
 
 var handleMessage = function(err, msg) {
   if(err){
     console.log(err);
-    return keepListening();
+    setTimeout(keepListening, 10000);
+    return;
   }
   if(!msg){
     console.log('No data received.');
@@ -74,12 +92,16 @@ var handleMessage = function(err, msg) {
     console.log('Unknown SQS message id: ' + recvMsgID);
     return keepListening();
   }
-  simpleLogger.info('Received S3 file hash calculation from SQS', {
-    s3bucket: msg.MessageAttributes.s3bucket.StringValue,
-    s3key: msg.MessageAttributes.s3key.StringValue,
-  });
-  keepListening();
+  // TODO check the log for the same request
+  var s3fileInfo = {
+    Bucket: msg.MessageAttributes.s3bucket.StringValue,
+    Key: msg.MessageAttributes.s3key.StringValue,
+  };
+  var logData = { s3bucket: s3fileInfo.Bucket, s3key: s3fileInfo.Key };
+  simpleLogger.info('Received S3 file hash calculation request from SQS', logData);
+  s3.getObject(s3fileInfo, calcDigests(logData));
 }
+
 
 console.log('Digest server started.');
 keepListening();

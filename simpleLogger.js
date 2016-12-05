@@ -12,7 +12,7 @@ simpledb.createDomain({ DomainName: DBdomain }, function(err, data) {
 		console.log(err, err.stack);
 		return;
 	}
-	console.log(data);
+	//console.log(data);
 });
 
 // simpledb.listDomains({}, function(err, data){
@@ -57,7 +57,10 @@ var log = function(level, message, details){
 		});
 	});
 	simpledb.putAttributes(logParams,
-		function(err,data) {console.log(data); return afterLogFunc(err, logParams)});
+		function(err,data) {
+			// console.log(data); 
+			return afterLogFunc(err, logParams)
+		});
 };
 
 var getLogs = function(cb){
